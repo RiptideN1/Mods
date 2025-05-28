@@ -2,13 +2,14 @@
 // @name         Narrow.One Arrow Trail Color Mod
 // @namespace    http://tampermonkey.net/
 // @version      1.4
-// @description  Hell yea
+// @description  PRESS P TO CHANGE COLOR
 // @author       Riptide
 // @match        https://narrow.one/*
 // @grant        none
 // @run-at       document-start
 // ==/UserScript==
 
+//P TO CHANGE COLOR
 (function() {
     "use strict";
 
