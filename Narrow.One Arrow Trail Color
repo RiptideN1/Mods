@@ -1,0 +1,125 @@
+// ==UserScript==
+// @name         Narrow.One Arrow Trail Color Mod
+// @namespace    http://tampermonkey.net/
+// @version      1.4
+// @description  Hell yea
+// @author       Riptide
+// @match        https://narrow.one/*
+// @grant        none
+// @run-at       document-start
+// ==/UserScript==
+
+(function() {
+    "use strict";
+
+    window.NarrowSDK = window.NarrowSDK || {};
+
+    if (!window.NarrowSDK._hooked) {
+        window.NarrowSDK._hooked = true;
+        const originalBind = Function.prototype.bind;
+        Function.prototype.bind = function (thisRef, ...options) {
+            if (thisRef && thisRef.input !== undefined && !window.NarrowSDK.Main) {
+                window.NarrowSDK.Main = thisRef;
+            }
+            return originalBind.call(this, thisRef, ...options);
+        };
+    }
+
+    let persistentColor = "#0a6e7b";
+
+    function waitForArrowTrailMat(cb, tries = 0) {
+        const main = window.NarrowSDK.Main;
+        if (main && main.materials && main.materials.arrowTrailMat && main.materials.arrowTrailMat.uniforms && main.materials.arrowTrailMat.uniforms.colorMultiplier && main.materials.arrowTrailMat.uniforms.colorMultiplier.value) {
+            cb(main.materials.arrowTrailMat);
+        } else {
+            if (tries < 40) setTimeout(() => waitForArrowTrailMat(cb, tries + 1), 250);
+        }
+    }
+
+    function parseColor(str, ColorClass) {
+        let dummy = document.createElement("div");
+        dummy.style.color = str;
+        document.body.appendChild(dummy);
+        let rgb = getComputedStyle(dummy).color;
+        document.body.removeChild(dummy);
+        let m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (m) {
+            let r = parseInt(m[1]) / 255, g = parseInt(m[2]) / 255, b = parseInt(m[3]) / 255;
+            return new ColorClass(r, g, b);
+        }
+        return new ColorClass(0, 1, 0);
+    }
+
+    function setArrowTrailColor(mat, colorStr) {
+        try {
+            const ColorClass = mat.uniforms.colorMultiplier.value.constructor;
+            const color = parseColor(colorStr, ColorClass);
+            mat.uniforms.colorMultiplier.value = color;
+            mat.uniforms.colorAdder.value = new ColorClass(0, 0, 0);
+            mat.uniforms.saturation.value = 1;
+            mat.uniformsNeedUpdate = true;
+            mat.needsUpdate = true;
+        } catch (e) {}
+    }
+
+    setInterval(() => {
+        waitForArrowTrailMat(mat => setArrowTrailColor(mat, persistentColor));
+    }, 100);
+
+document.addEventListener("keydown", function(ev) {
+    if (ev.key.toLowerCase() === "p" && !ev.repeat) {
+        if (colorPickerInput) {
+            closeColorPicker();
+        } else {
+            waitForArrowTrailMat(mat => {
+                openColorPicker(persistentColor, newColor => {
+                    persistentColor = newColor;
+                    setArrowTrailColor(mat, persistentColor);
+                });
+            });
+        }
+    }
+});
+
+
+let colorPickerInput = null;
+
+function openColorPicker(currentColor, callback) {
+    if (colorPickerInput) return;
+
+    const input = document.createElement("input");
+    input.type = "color";
+    input.value = currentColor;
+    input.style.position = "fixed";
+    input.style.top = "20px";
+    input.style.left = "20px";
+    input.style.zIndex = 9999;
+    input.style.border = "none";
+    input.style.background = "none";
+    input.style.padding = "0";
+    input.style.width = "40px";
+    input.style.height = "40px";
+    document.body.appendChild(input);
+
+    input.addEventListener("input", () => {
+        callback(input.value);
+    });
+
+    input.addEventListener("blur", () => {
+        closeColorPicker();
+    });
+
+    input.focus();
+    colorPickerInput = input;
+}
+
+function closeColorPicker() {
+    if (colorPickerInput) {
+        colorPickerInput.remove();
+        colorPickerInput = null;
+    }
+}
+
+
+    waitForArrowTrailMat(mat => { window.arrowTrailMat = mat; });
+})();
