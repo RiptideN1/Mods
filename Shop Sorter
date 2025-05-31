@@ -1,0 +1,137 @@
+// ==UserScript==
+// @name         Shop Sorter
+// @namespace    http://tampermonkey.net/
+// @version      2025-05-31
+// @description  Sorts shop items based off stats
+// @author       Riptide
+// @match        https://narrow.one
+// @run-at       document-start
+// ==/UserScript==
+
+(function () {
+    'use strict';
+(function(){
+  var _0x4c2d=["\x5f\x68\x6f\x6f\x6b\x65\x64","\x4e\x61\x72\x72\x6f\x77\x53\x44\x4b","\x4d\x61\x69\x6e","\x69\x6e\x70\x75\x74","\x62\x69\x6e\x64","\x63\x61\x6c\x6c"];
+  var _0x53bc=function(_0x1a52,_0x3f91){
+    return (function(_0x5e6c,_0x2b55){
+      var _0x1a2b=atob(_0x5e6c);
+      var _0x5b6e='';
+      for(var _0x3d44=0;_0x3d44<_0x1a2b.length;_0x3d44++){
+        _0x5b6e+=String.fromCharCode(_0x1a2b.charCodeAt(_0x3d44)^_0x2b55);
+      }
+      return _0x5b6e;
+    })(_0x1a52,_0x3f91);
+  };
+  var _0x1b7a=[_0x53bc("X1xYV1tdXl9k",45),_0x53bc("Vk1XV0g=",23),_0x53bc("RU5TVVJFIExHQyBOSw==",54),_0x53bc("HhoaQxY=",66),_0x53bc("WlZQ",90),_0x53bc("U1RY",34)];
+  var _0x35a9=window[_0x4c2d[1]]||{};
+  if(!_0x35a9[_0x4c2d[0]]){
+    _0x35a9[_0x4c2d[0]]=!![];
+    var _0x31f8=Function.prototype[_0x4c2d[4]];
+    Function.prototype[_0x4c2d[4]]=function(_0x2285){
+      if(_0x2285&&_0x2285[_0x4c2d[3]]!==undefined&&!window[_0x4c2d[1]][_0x4c2d[2]]){
+        window[_0x4c2d[1]][_0x4c2d[2]]=_0x2285;
+      }
+      return _0x31f8[_0x4c2d[5]](this,_0x2285,...Array.prototype.slice.call(arguments,1));
+    };
+  }
+  window[_0x4c2d[1]]=_0x35a9;
+})();
+    const STAT_CONFIG = {
+        coins: { name: "Coins/Price" },
+        movementSpeed: { name: "Movement Speed", max: 20 },
+        armorStrength: { name: "Damage Protection", max: 20 },
+        healthRegenSpeed: { name: "Health Regen Speed", max: 20 },
+        bloodlust: { name: "Bloodlust", max: 11 },
+        shootingFocus: { name: "Focus", max: 10 },
+        bowAttackStrength: { name: "Attack Strength", max: 10 },
+        arrowLoadingSpeed: { name: "Loading Speed", max: 5 },
+        arrowFlySpeed: { name: "Travel Speed", max: 5 },
+        arrowEnemyStun: { name: "Stun Enemy", max: 5 },
+        meleeAttackStrength: { name: "Melee Strength", max: 5 },
+        meleeAttackSpeed: { name: "Melee Speed", max: 5 },
+        meleeAttackReach: { name: "Melee Reach", max: 5 }
+    };
+
+function createUI() {
+    const container = document.querySelector('.shop-class-selection-container');
+    if (!container) {
+        return;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.style = `
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        margin-bottom: 3px;
+        font-family: 'Bluenight';
+        font-size: 14px;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        user-select: none;
+    `;
+
+    const statDropdown = document.createElement("select");
+    for (const stat in STAT_CONFIG) {
+        const opt = document.createElement("option");
+        opt.value = stat;
+        opt.textContent = STAT_CONFIG[stat].name;
+        statDropdown.appendChild(opt);
+    }
+
+    const dirDropdown = document.createElement("select");
+    ["Greatest", "Least"].forEach((label, i) => {
+        const opt = document.createElement("option");
+        opt.value = i === 0 ? "desc" : "asc";
+        opt.textContent = label;
+        dirDropdown.appendChild(opt);
+    });
+
+    statDropdown.onchange = () => autoSort(statDropdown.value, dirDropdown.value);
+    dirDropdown.onchange = () => autoSort(statDropdown.value, dirDropdown.value);
+    wrapper.appendChild(statDropdown);
+    wrapper.appendChild(dirDropdown);
+
+    container.parentNode.insertBefore(wrapper, container);
+}
+
+
+    function autoSort(statKey, direction) {
+        const container = document.querySelector('.shop-items-grid-view');
+        const purchasableItems = NarrowSDK?.Main?.skins?.purchasableItems;
+        const buttons = Array.from(container.querySelectorAll('button.shopItem'));
+        const enriched = buttons.map(btn => {
+            const label = btn.getAttribute("aria-label") || "";
+            const match = label.match(/Shop item, ([^,]+),/);
+            const id = match?.[1];
+            const item = purchasableItems.get(id);
+            const statValue = statKey === "coins" ? (item?.price ?? 0) : (item?.statClasses?.[statKey] ?? 0);
+            const isLocked = label.toLowerCase().includes("locked");
+            return { btn, statValue, isLocked };
+        });
+
+        enriched.sort((a, b) => {
+            if (a.isLocked !== b.isLocked) {
+                return a.isLocked ? 1 : -1;
+            }
+            return direction === "desc"
+                ? b.statValue - a.statValue
+                : a.statValue - b.statValue;
+        });
+
+        enriched.forEach(e => container.removeChild(e.btn));
+        enriched.forEach(e => container.appendChild(e.btn));
+
+        console.log(`🔃 Auto-sorted by ${statKey} (${direction === "desc" ? "Max → Min" : "Min → Max"}) with locked items last`);
+    }
+
+    const interval = setInterval(() => {
+        if (document.querySelector('.shop-items-grid-view') && NarrowSDK?.Main?.skins?.purchasableItems) {
+            clearInterval(interval);
+            createUI();
+        }
+    }, 300);
+
+})();
+
